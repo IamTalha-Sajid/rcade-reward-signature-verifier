@@ -3,14 +3,12 @@ import { ethers } from 'ethers';
 // EIP-712 type definition for reward claim (matching RCadeRewardDistribution)
 export const REWARD_CLAIM_TYPES = {
   RewardClaimAttestation: [
-    { name: "wallet", type: "address" },
     { name: "playerId", type: "string" },
     { name: "amount", type: "uint256" }
   ]
 };
 
 export interface RewardClaimData {
-  wallet: string;
   playerId: string;
   amount: string;
 }
@@ -28,7 +26,6 @@ export interface EIP712Domain {
  */
 export async function generateRewardClaimSignature(
   signer: ethers.Signer,
-  wallet: string,
   playerId: string,
   amount: string,
   contractAddress?: string,
@@ -70,7 +67,6 @@ export async function generateRewardClaimSignature(
   
   // Create the data to sign
   const data: RewardClaimData = {
-    wallet,
     playerId,
     amount
   };
@@ -85,7 +81,12 @@ export async function generateRewardClaimSignature(
  * Validate Ethereum address
  */
 export function isValidAddress(address: string): boolean {
-  return ethers.isAddress(address);
+  try {
+    return ethers.isAddress(address);
+  } catch (error) {
+    // Fallback validation for basic address format
+    return /^0x[a-fA-F0-9]{40}$/.test(address);
+  }
 }
 
 /**
@@ -105,4 +106,40 @@ export function isValidAmount(amount: string): boolean {
  */
 export function isValidPlayerId(playerId: string): boolean {
   return playerId.trim().length > 0;
+}
+
+/**
+ * Convert ETH to wei
+ */
+export function ethToWei(ethAmount: string): string {
+  try {
+    const wei = ethers.parseEther(ethAmount);
+    return wei.toString();
+  } catch (error) {
+    throw new Error('Invalid ETH amount');
+  }
+}
+
+/**
+ * Convert wei to ETH
+ */
+export function weiToEth(weiAmount: string): string {
+  try {
+    const eth = ethers.formatEther(weiAmount);
+    return eth;
+  } catch (error) {
+    throw new Error('Invalid wei amount');
+  }
+}
+
+/**
+ * Validate ETH amount (must be positive number)
+ */
+export function isValidEthAmount(ethAmount: string): boolean {
+  try {
+    const num = parseFloat(ethAmount);
+    return !isNaN(num) && num > 0;
+  } catch {
+    return false;
+  }
 }

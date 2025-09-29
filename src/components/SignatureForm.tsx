@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FileText, Copy, Check, AlertCircle } from 'lucide-react';
 import { useWallet } from '../hooks/useWallet';
-import { generateRewardClaimSignature, isValidAmount, isValidPlayerId } from '../utils/eip712';
+import { generateRewardClaimSignature, isValidEthAmount, isValidPlayerId, ethToWei } from '../utils/eip712';
 
 interface FormData {
   playerId: string;
@@ -17,7 +17,7 @@ export function SignatureForm() {
   const { address, isConnected, signer, chainId, isSwitchingChain, switchToCorrectChain } = useWallet();
   const [formData, setFormData] = useState<FormData>({
     playerId: import.meta.env.VITE_DEFAULT_PLAYER_ID || '',
-    amount: import.meta.env.VITE_DEFAULT_AMOUNT || '',
+    amount: import.meta.env.VITE_DEFAULT_AMOUNT ? (parseFloat(import.meta.env.VITE_DEFAULT_AMOUNT) / 1e18).toString() : '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isGenerating, setIsGenerating] = useState(false);
@@ -39,7 +39,7 @@ export function SignatureForm() {
 
     if (!formData.amount.trim()) {
       newErrors.amount = 'Amount is required';
-    } else if (!isValidAmount(formData.amount)) {
+    } else if (!isValidEthAmount(formData.amount)) {
       newErrors.amount = 'Amount must be a positive number';
     }
 
@@ -68,11 +68,13 @@ export function SignatureForm() {
     setSignature(null);
 
     try {
+      // Convert ETH to wei before signing
+      const amountInWei = ethToWei(formData.amount);
+      
       const sig = await generateRewardClaimSignature(
         signer,
-        address,
         formData.playerId,
-        formData.amount,
+        amountInWei,
         undefined, // contractAddress - will use env variable
         chainId || undefined // chainId - use the wallet's actual chain ID
       );
@@ -158,21 +160,21 @@ export function SignatureForm() {
 
           <div>
             <label htmlFor="amount" className="block text-sm font-medium text-slate-300 mb-2">
-              Amount (Wei)
+              Amount (ETH)
             </label>
             <input
               id="amount"
               type="text"
               value={formData.amount}
               onChange={(e) => handleInputChange('amount', e.target.value)}
-              placeholder="Enter amount in wei (e.g., 1000000000000000000)"
+              placeholder="Enter amount in ETH (e.g., 1.0)"
               className={`input-field ${errors.amount ? 'error' : ''}`}
             />
             {errors.amount && (
               <p className="mt-1 text-sm text-red-600">{errors.amount}</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
-              Enter the cumulative total amount in wei (1 ETH = 1000000000000000000 wei)
+              Enter the cumulative total amount in ETH (will be converted to wei automatically)
             </p>
           </div>
 
@@ -220,13 +222,13 @@ export function SignatureForm() {
           <div className="mt-4 p-4 bg-slate-700 rounded-lg">
             <h4 className="font-medium text-blue-300 mb-2">Signature Details</h4>
             <div className="text-sm text-slate-300 space-y-1">
-              <p><strong>Wallet:</strong> {address}</p>
               <p><strong>Player ID:</strong> {formData.playerId}</p>
-              <p><strong>Amount:</strong> {formData.amount} wei</p>
+              <p><strong>Amount:</strong> {formData.amount} ETH ({ethToWei(formData.amount)} wei)</p>
               <p><strong>Contract:</strong> {import.meta.env.VITE_CONTRACT_ADDRESS}</p>
               <p><strong>Chain ID:</strong> {chainId}</p>
               <p><strong>Domain Name:</strong> RCadeRewardDistribution</p>
               <p><strong>Version:</strong> 1</p>
+              <p><strong>Note:</strong> Signature is not tied to a specific wallet address</p>
             </div>
           </div>
         </div>

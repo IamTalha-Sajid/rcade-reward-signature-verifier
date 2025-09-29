@@ -15,14 +15,14 @@ A beautiful React application for generating EIP-712 signatures compatible with 
 This tool generates EIP-712 signatures that are compatible with the RCadeRewardDistribution smart contract. The signatures follow the standard structure:
 
 ```solidity
-RewardClaimAttestation(address wallet, string playerId, uint256 amount)
+RewardClaimAttestation(string playerId, uint256 amount)
 ```
 
 ### Key Features
 
 - **EIP-712 Standard**: Uses structured data signing for enhanced security
 - **Replay Protection**: Signatures are tied to specific contract and chain
-- **Cumulative Amounts**: Enter total cumulative amount, not delta
+- **Cumulative Amounts**: Enter total cumulative amount in ETH, not delta
 - **Validation**: Input validation for all fields
 
 ## Getting Started
@@ -59,15 +59,18 @@ npm run dev
    VITE_CONTRACT_ADDRESS=0xYourContractAddress
    VITE_CHAIN_ID=421614
    VITE_DEFAULT_PLAYER_ID=player123
-   VITE_DEFAULT_AMOUNT=1000000000000000000
+   VITE_DEFAULT_AMOUNT=1.0
    ```
+
+### Vercel Deployment URL
+https://rcade-reward-signature-verifier.vercel.app/
 
 ### Usage
 
 1. **Connect Wallet**: Click "Connect MetaMask" to connect your wallet
 2. **Fill Form**: Enter the required information:
    - **Player ID**: Unique identifier for the player (pre-filled from env)
-   - **Amount**: Cumulative total amount in wei (pre-filled from env)
+   - **Amount**: Cumulative total amount in ETH (pre-filled from env, automatically converted to wei)
 3. **Generate Signature**: Click "Generate Signature" to create the EIP-712 signature
 4. **Copy Signature**: Use the copy button to copy the generated signature
 
@@ -90,11 +93,12 @@ The signature is generated for the following data structure:
 
 ```javascript
 {
-  wallet: "0x...",      // User's wallet address
   playerId: "player123", // Player identifier
   amount: "1000000000000000000" // Amount in wei
 }
 ```
+
+**Note:** The signature is not tied to a specific wallet address, making it reusable across different wallets.
 
 ### Security Features
 

@@ -11,7 +11,8 @@ export function InfoCard() {
           <h3 className="font-semibold text-white">How it works</h3>
           <div className="space-y-2 text-sm text-slate-300">
             <p>
-              This tool generates EIP-712 signatures compatible with the RCadeRewardDistribution smart contract.
+              This tool generates EIP-712 signatures compatible with the RCadeRewardDistribution smart contract. 
+              Signatures are wallet-independent and can be used by any wallet.
             </p>
             <div className="space-y-2">
               <div className="flex items-start gap-2">
@@ -24,6 +25,12 @@ export function InfoCard() {
                 <Shield className="w-4 h-4 text-primary-600 mt-0.5" />
                 <span>
                   <strong>Replay Protection:</strong> Signatures are tied to specific contract and chain
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                <span>
+                  <strong>Wallet Independent:</strong> Signatures are not tied to specific wallet addresses
                 </span>
               </div>
               <div className="flex items-start gap-2">
