@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Shield, CheckCircle, XCircle, AlertCircle, Copy, Check } from 'lucide-react';
 import { useWallet } from '../hooks/useWallet';
 import { ethers } from 'ethers';
-import { ethToWei, isValidEthAmount, isValidAddress } from '../utils/eip712';
+import { ethToWei, isValidEthAmount, isValidAddress, isValidEventId } from '../utils/eip712';
 
 interface VerificationData {
   signature: string;
   playerId: string;
   amount: string;
+  eventId: string;
   contractAddress: string;
   trustedSigner: string;
 }
@@ -16,18 +17,20 @@ interface VerificationErrors {
   signature?: string;
   playerId?: string;
   amount?: string;
+  eventId?: string;
   contractAddress?: string;
   trustedSigner?: string;
 }
 
 export function SignatureVerifier() {
-  const { isConnected, provider, chainId } = useWallet();
+  const { isConnected, provider, chainId, address } = useWallet();
   const [verificationData, setVerificationData] = useState<VerificationData>({
     signature: '',
     playerId: '',
     amount: '',
+    eventId: '',
     contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS || '',
-    trustedSigner: '',
+    trustedSigner: address || '',
   });
   const [errors, setErrors] = useState<VerificationErrors>({});
   const [isVerifying, setIsVerifying] = useState(false);
@@ -38,7 +41,7 @@ export function SignatureVerifier() {
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // SignatureVerifier contract ABI (matches new deployed contract without wallet parameter)
+  // SignatureVerifier contract ABI (matches new deployed contract with eventId parameter)
   const SIGNATURE_VERIFIER_ABI = [
     {
       "inputs": [
@@ -55,6 +58,11 @@ export function SignatureVerifier() {
         {
           "internalType": "uint256",
           "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "eventId",
           "type": "uint256"
         },
         {
@@ -95,6 +103,11 @@ export function SignatureVerifier() {
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "eventId",
+          "type": "uint256"
         }
       ],
       "name": "getDigest",
@@ -110,7 +123,7 @@ export function SignatureVerifier() {
     }
   ];
 
-  const SIGNATURE_VERIFIER_ADDRESS = import.meta.env.VITE_SIGNATURE_VERIFIER_ADDRESS || '0x43bDE097E0Aa93188BA11CDbA9AeEBfba0F1b183';
+  const SIGNATURE_VERIFIER_ADDRESS = import.meta.env.VITE_SIGNATURE_VERIFIER_ADDRESS || '';
 
   const validateForm = (): boolean => {
     const newErrors: VerificationErrors = {};
@@ -118,7 +131,6 @@ export function SignatureVerifier() {
     if (!verificationData.signature.trim()) {
       newErrors.signature = 'Signature is required';
     }
-
 
     if (!verificationData.playerId.trim()) {
       newErrors.playerId = 'Player ID is required';
@@ -128,6 +140,12 @@ export function SignatureVerifier() {
       newErrors.amount = 'Amount is required';
     } else if (!isValidEthAmount(verificationData.amount)) {
       newErrors.amount = 'Amount must be a positive number';
+    }
+
+    if (!verificationData.eventId.trim()) {
+      newErrors.eventId = 'Event ID is required';
+    } else if (!isValidEventId(verificationData.eventId)) {
+      newErrors.eventId = 'Event ID must be a non-negative integer';
     }
 
     if (!verificationData.contractAddress.trim()) {
@@ -174,6 +192,14 @@ export function SignatureVerifier() {
       // Convert ETH to wei before verification
       const amountInWei = ethToWei(verificationData.amount);
       
+      // Convert eventId to BigInt and validate
+      let eventIdBigInt: bigint;
+      try {
+        eventIdBigInt = BigInt(verificationData.eventId);
+      } catch (error) {
+        throw new Error('Invalid event ID format. Must be a valid integer.');
+      }
+      
       // Debug: Log the contract address being used
       console.log('Using contract address:', SIGNATURE_VERIFIER_ADDRESS);
       
@@ -189,15 +215,67 @@ export function SignatureVerifier() {
         verifyingContract: verificationData.contractAddress,
         playerId: verificationData.playerId,
         amount: amountInWei,
+        eventId: eventIdBigInt.toString(),
+        eventIdBigInt: eventIdBigInt,
         signature: verificationData.signature,
         trustedSigner: verificationData.trustedSigner
       });
       
-      // Call the verification function (new contract without wallet parameter)
+      // Let's also manually verify the signature using EIP-712 to compare
+      try {
+        const domain = {
+          name: "RCadeRewardDistribution",
+          version: "1",
+          chainId: chainId,
+          verifyingContract: verificationData.contractAddress
+        };
+        
+        const types = {
+          RewardClaimAttestation: [
+            { name: "playerId", type: "string" },
+            { name: "amount", type: "uint256" },
+            { name: "eventId", type: "uint256" }
+          ]
+        };
+        
+        const message = {
+          playerId: verificationData.playerId,
+          amount: amountInWei,
+          eventId: eventIdBigInt.toString()
+        };
+        
+        const digest = ethers.TypedDataEncoder.hash(domain, types, message);
+        console.log('Manual EIP-712 digest:', digest);
+        console.log('Contract digest from getDigest:', digest);
+        console.log('Digests match:', digest === digest);
+        
+        // Let's also log the exact parameters being sent to the contract
+        console.log('Exact contract call parameters:');
+        console.log('- verifyingContract:', verificationData.contractAddress);
+        console.log('- playerId:', verificationData.playerId);
+        console.log('- amount (wei):', amountInWei);
+        console.log('- eventId:', eventIdBigInt.toString());
+        console.log('- signature:', verificationData.signature);
+        console.log('- trustedSigner:', verificationData.trustedSigner);
+        
+        const recoveredAddress = ethers.verifyTypedData(domain, types, message, verificationData.signature);
+        console.log('Recovered address from signature:', recoveredAddress);
+        console.log('Expected trusted signer:', verificationData.trustedSigner);
+        console.log('Addresses match:', recoveredAddress.toLowerCase() === verificationData.trustedSigner.toLowerCase());
+      } catch (error) {
+        console.log('Manual verification error:', error);
+      }
+      
+      console.log('Raw form data:', verificationData);
+      console.log('Verifier contract address:', SIGNATURE_VERIFIER_ADDRESS);
+      console.log('Contract address in EIP-712 domain:', verificationData.contractAddress);
+      
+      // Call the verification function (new contract with eventId parameter)
       const isValid = await contract.verifyRewardClaimDynamic(
         verificationData.contractAddress,
         verificationData.playerId,
         amountInWei, // Use converted wei amount
+        eventIdBigInt, // Use the converted BigInt
         verificationData.signature,
         verificationData.trustedSigner
       );
@@ -208,8 +286,10 @@ export function SignatureVerifier() {
         digest = await contract.getDigest(
           verificationData.contractAddress,
           verificationData.playerId,
-          amountInWei // Use converted wei amount
+          amountInWei, // Use converted wei amount
+          eventIdBigInt // Use the converted BigInt
         );
+        console.log('Contract digest:', digest);
       } catch (error) {
         console.warn('Could not get digest:', error);
       }
@@ -319,6 +399,26 @@ export function SignatureVerifier() {
           </div>
 
           <div>
+            <label htmlFor="verify-eventId" className="block text-sm font-medium text-slate-300 mb-2">
+              Event ID
+            </label>
+            <input
+              id="verify-eventId"
+              type="text"
+              value={verificationData.eventId}
+              onChange={(e) => handleInputChange('eventId', e.target.value)}
+              placeholder="Enter event ID (e.g., 123)"
+              className={`input-field ${errors.eventId ? 'error' : ''}`}
+            />
+            {errors.eventId && (
+              <p className="mt-1 text-sm text-red-600">{errors.eventId}</p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Enter the event ID as a non-negative integer
+            </p>
+          </div>
+
+          <div>
             <label htmlFor="verify-contract" className="block text-sm font-medium text-slate-300 mb-2">
               Contract Address
             </label>
@@ -351,7 +451,7 @@ export function SignatureVerifier() {
               <p className="mt-1 text-sm text-red-600">{errors.trustedSigner}</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
-              This address will be used for trusted signer parameter
+              This should be the address of the wallet that signed the message. Current wallet: {address || 'Not connected'}
             </p>
           </div>
 
@@ -432,6 +532,7 @@ export function SignatureVerifier() {
               <p><strong>Chain ID:</strong> {chainId}</p>
               <p><strong>Player ID:</strong> {verificationData.playerId}</p>
               <p><strong>Amount:</strong> {verificationData.amount} ETH ({ethToWei(verificationData.amount)} wei)</p>
+              <p><strong>Event ID:</strong> {verificationData.eventId}</p>
               <p><strong>Contract:</strong> {verificationData.contractAddress}</p>
               <p><strong>Trusted Signer:</strong> {verificationData.trustedSigner}</p>
             </div>

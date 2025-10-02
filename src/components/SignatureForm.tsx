@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { FileText, Copy, Check, AlertCircle } from 'lucide-react';
 import { useWallet } from '../hooks/useWallet';
-import { generateRewardClaimSignature, isValidEthAmount, isValidPlayerId, ethToWei } from '../utils/eip712';
+import { generateRewardClaimSignature, isValidEthAmount, isValidPlayerId, isValidEventId, ethToWei } from '../utils/eip712';
 
 interface FormData {
   playerId: string;
   amount: string;
+  eventId: string;
 }
 
 interface FormErrors {
   playerId?: string;
   amount?: string;
+  eventId?: string;
 }
 
 export function SignatureForm() {
@@ -18,6 +20,7 @@ export function SignatureForm() {
   const [formData, setFormData] = useState<FormData>({
     playerId: import.meta.env.VITE_DEFAULT_PLAYER_ID || '',
     amount: import.meta.env.VITE_DEFAULT_AMOUNT ? (parseFloat(import.meta.env.VITE_DEFAULT_AMOUNT) / 1e18).toString() : '',
+    eventId: import.meta.env.VITE_DEFAULT_EVENT_ID || '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isGenerating, setIsGenerating] = useState(false);
@@ -41,6 +44,12 @@ export function SignatureForm() {
       newErrors.amount = 'Amount is required';
     } else if (!isValidEthAmount(formData.amount)) {
       newErrors.amount = 'Amount must be a positive number';
+    }
+
+    if (!formData.eventId.trim()) {
+      newErrors.eventId = 'Event ID is required';
+    } else if (!isValidEventId(formData.eventId)) {
+      newErrors.eventId = 'Event ID must be a non-negative integer';
     }
 
     setErrors(newErrors);
@@ -71,10 +80,14 @@ export function SignatureForm() {
       // Convert ETH to wei before signing
       const amountInWei = ethToWei(formData.amount);
       
+      console.log('Signature generation - Chain ID:', chainId);
+      console.log('Signature generation - Contract Address:', import.meta.env.VITE_CONTRACT_ADDRESS);
+      
       const sig = await generateRewardClaimSignature(
         signer,
         formData.playerId,
         amountInWei,
+        formData.eventId,
         undefined, // contractAddress - will use env variable
         chainId || undefined // chainId - use the wallet's actual chain ID
       );
@@ -178,6 +191,26 @@ export function SignatureForm() {
             </p>
           </div>
 
+          <div>
+            <label htmlFor="eventId" className="block text-sm font-medium text-slate-300 mb-2">
+              Event ID
+            </label>
+            <input
+              id="eventId"
+              type="text"
+              value={formData.eventId}
+              onChange={(e) => handleInputChange('eventId', e.target.value)}
+              placeholder="Enter event ID (e.g., 123)"
+              className={`input-field ${errors.eventId ? 'error' : ''}`}
+            />
+            {errors.eventId && (
+              <p className="mt-1 text-sm text-red-600">{errors.eventId}</p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Enter the event ID as a non-negative integer
+            </p>
+          </div>
+
 
           <button
             onClick={handleGenerateSignature}
@@ -224,6 +257,7 @@ export function SignatureForm() {
             <div className="text-sm text-slate-300 space-y-1">
               <p><strong>Player ID:</strong> {formData.playerId}</p>
               <p><strong>Amount:</strong> {formData.amount} ETH ({ethToWei(formData.amount)} wei)</p>
+              <p><strong>Event ID:</strong> {formData.eventId}</p>
               <p><strong>Contract:</strong> {import.meta.env.VITE_CONTRACT_ADDRESS}</p>
               <p><strong>Chain ID:</strong> {chainId}</p>
               <p><strong>Domain Name:</strong> RCadeRewardDistribution</p>

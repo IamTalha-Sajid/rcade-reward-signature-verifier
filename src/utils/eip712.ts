@@ -4,13 +4,15 @@ import { ethers } from 'ethers';
 export const REWARD_CLAIM_TYPES = {
   RewardClaimAttestation: [
     { name: "playerId", type: "string" },
-    { name: "amount", type: "uint256" }
+    { name: "amount", type: "uint256" },
+    { name: "eventId", type: "uint256" }
   ]
 };
 
 export interface RewardClaimData {
   playerId: string;
   amount: string;
+  eventId: string;
 }
 
 export interface EIP712Domain {
@@ -28,6 +30,7 @@ export async function generateRewardClaimSignature(
   signer: ethers.Signer,
   playerId: string,
   amount: string,
+  eventId: string,
   contractAddress?: string,
   chainId?: number
 ): Promise<string> {
@@ -68,7 +71,8 @@ export async function generateRewardClaimSignature(
   // Create the data to sign
   const data: RewardClaimData = {
     playerId,
-    amount
+    amount,
+    eventId
   };
 
   // Generate the signature using ethers.js
@@ -139,6 +143,18 @@ export function isValidEthAmount(ethAmount: string): boolean {
   try {
     const num = parseFloat(ethAmount);
     return !isNaN(num) && num > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate event ID (must be a non-negative integer)
+ */
+export function isValidEventId(eventId: string): boolean {
+  try {
+    const num = parseInt(eventId, 10);
+    return !isNaN(num) && num >= 0 && Number.isInteger(num);
   } catch {
     return false;
   }
