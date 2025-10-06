@@ -75,15 +75,15 @@ export function useWallet() {
   };
 
   // Switch to correct chain
-  const switchToCorrectChain = async () => {
+  const switchToCorrectChain = async (targetChainId?: number) => {
     if (!isMetaMaskInstalled() || !window.ethereum) {
       setError('MetaMask is not available');
       return;
     }
 
-    const targetChainId = import.meta.env.VITE_CHAIN_ID;
-    if (!targetChainId) {
-      setError('Target chain ID not configured');
+    const chainIdToUse = targetChainId || import.meta.env.VITE_CHAIN_ID;
+    if (!chainIdToUse) {
+      setError('Target chain ID not provided');
       return;
     }
 
@@ -94,7 +94,7 @@ export function useWallet() {
       // Try to switch to the target chain
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: `0x${Number(targetChainId).toString(16)}` }],
+        params: [{ chainId: `0x${Number(chainIdToUse).toString(16)}` }],
       });
       
       // Refresh the connection after switching
@@ -103,7 +103,7 @@ export function useWallet() {
       // If the chain doesn't exist, try to add it
       if (switchError.code === 4902) {
         try {
-          await addAndSwitchToChain(targetChainId);
+          await addAndSwitchToChain(chainIdToUse.toString());
           await connectWallet();
         } catch (addError: any) {
           setError(`Failed to add chain: ${addError.message}`);
@@ -143,17 +143,6 @@ export function useWallet() {
         },
         rpcUrls: ['https://arb1.arbitrum.io/rpc'],
         blockExplorerUrls: ['https://arbiscan.io/'],
-      },
-      '1': { // Ethereum Mainnet
-        chainId: chainIdHex,
-        chainName: 'Ethereum Mainnet',
-        nativeCurrency: {
-          name: 'Ether',
-          symbol: 'ETH',
-          decimals: 18,
-        },
-        rpcUrls: ['https://eth.llamarpc.com'],
-        blockExplorerUrls: ['https://etherscan.io/'],
       },
     };
 

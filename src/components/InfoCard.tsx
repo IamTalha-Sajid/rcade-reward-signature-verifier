@@ -12,7 +12,7 @@ export function InfoCard() {
           <div className="space-y-2 text-sm text-slate-300">
             <p>
               This tool generates EIP-712 signatures compatible with the RCadeRewardDistribution smart contract. 
-              Signatures are wallet-independent and can be used by any wallet.
+              Signatures are wallet-independent and can be used by any wallet for reward claims.
             </p>
             <div className="space-y-2">
               <div className="flex items-start gap-2">
@@ -37,12 +37,6 @@ export function InfoCard() {
                 <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
                 <span>
                   <strong>Cumulative Amounts:</strong> Enter total cumulative amount, not delta
-                </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                <span>
-                  <strong>Signature Verification:</strong> Verify signatures using the deployed contract
                 </span>
               </div>
             </div>

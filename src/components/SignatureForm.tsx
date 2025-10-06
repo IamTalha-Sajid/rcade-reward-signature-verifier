@@ -1,35 +1,35 @@
 import { useState } from 'react';
 import { FileText, Copy, Check, AlertCircle } from 'lucide-react';
 import { useWallet } from '../hooks/useWallet';
-import { generateRewardClaimSignature, isValidEthAmount, isValidPlayerId, isValidEventId, ethToWei } from '../utils/eip712';
+import { generateRewardClaimSignature, isValidEthAmount, isValidPlayerId, isValidEventId, isValidAddress, ethToWei } from '../utils/eip712';
 
 interface FormData {
   playerId: string;
   amount: string;
   eventId: string;
+  contractAddress: string;
 }
 
 interface FormErrors {
   playerId?: string;
   amount?: string;
   eventId?: string;
+  contractAddress?: string;
 }
 
 export function SignatureForm() {
-  const { address, isConnected, signer, chainId, isSwitchingChain, switchToCorrectChain } = useWallet();
+  const { address, isConnected, signer, chainId } = useWallet();
   const [formData, setFormData] = useState<FormData>({
-    playerId: import.meta.env.VITE_DEFAULT_PLAYER_ID || '',
-    amount: import.meta.env.VITE_DEFAULT_AMOUNT ? (parseFloat(import.meta.env.VITE_DEFAULT_AMOUNT) / 1e18).toString() : '',
-    eventId: import.meta.env.VITE_DEFAULT_EVENT_ID || '',
+    playerId: '',
+    amount: '',
+    eventId: '',
+    contractAddress: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Check if user is on the wrong chain
-  const targetChainId = Number(import.meta.env.VITE_CHAIN_ID);
-  const isWrongChain = chainId && targetChainId && chainId !== targetChainId;
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -50,6 +50,12 @@ export function SignatureForm() {
       newErrors.eventId = 'Event ID is required';
     } else if (!isValidEventId(formData.eventId)) {
       newErrors.eventId = 'Event ID must be a non-negative integer';
+    }
+
+    if (!formData.contractAddress.trim()) {
+      newErrors.contractAddress = 'Contract address is required';
+    } else if (!isValidAddress(formData.contractAddress)) {
+      newErrors.contractAddress = 'Invalid contract address';
     }
 
     setErrors(newErrors);
@@ -81,14 +87,14 @@ export function SignatureForm() {
       const amountInWei = ethToWei(formData.amount);
       
       console.log('Signature generation - Chain ID:', chainId);
-      console.log('Signature generation - Contract Address:', import.meta.env.VITE_CONTRACT_ADDRESS);
+      console.log('Signature generation - Contract Address:', formData.contractAddress);
       
       const sig = await generateRewardClaimSignature(
         signer,
         formData.playerId,
         amountInWei,
         formData.eventId,
-        undefined, // contractAddress - will use env variable
+        formData.contractAddress, // contractAddress - use form input
         chainId || undefined // chainId - use the wallet's actual chain ID
       );
       setSignature(sig);
@@ -133,25 +139,6 @@ export function SignatureForm() {
           <h2 className="text-xl font-semibold text-gray-900">Generate EIP-712 Signature</h2>
         </div>
         
-        {isWrongChain && (
-          <div className="mb-4 p-3 border rounded-lg bg-red-50 border-red-200">
-            <div className="flex items-center gap-2 text-red-800">
-              <AlertCircle className="w-4 h-4" />
-              <span className="text-sm font-medium">Wrong Network</span>
-            </div>
-            <p className="text-sm mt-1 text-red-700">
-              You're connected to the wrong network. 
-              Current: <strong>{chainId}</strong>, Required: <strong>{targetChainId}</strong>
-            </p>
-            <button
-              onClick={switchToCorrectChain}
-              disabled={isSwitchingChain}
-              className="mt-3 btn-primary"
-            >
-              {isSwitchingChain ? 'Switching Network...' : 'Switch to Correct Network'}
-            </button>
-          </div>
-        )}
 
         <div className="space-y-4">
           <div>
@@ -211,15 +198,33 @@ export function SignatureForm() {
             </p>
           </div>
 
+          <div>
+            <label htmlFor="contractAddress" className="block text-sm font-medium text-slate-300 mb-2">
+              Contract Address
+            </label>
+            <input
+              id="contractAddress"
+              type="text"
+              value={formData.contractAddress}
+              onChange={(e) => handleInputChange('contractAddress', e.target.value)}
+              placeholder="Enter contract address (0x...)"
+              className={`input-field ${errors.contractAddress ? 'error' : ''}`}
+            />
+            {errors.contractAddress && (
+              <p className="mt-1 text-sm text-red-600">{errors.contractAddress}</p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Enter the RCadeRewardDistribution contract address
+            </p>
+          </div>
+
 
           <button
             onClick={handleGenerateSignature}
-            disabled={isGenerating || !!isWrongChain}
+            disabled={isGenerating}
             className="btn-primary w-full"
           >
-            {isGenerating ? 'Generating Signature...' : 
-             isWrongChain ? 'Switch to Correct Network First' : 
-             'Generate Signature'}
+            {isGenerating ? 'Generating Signature...' : 'Generate Signature'}
           </button>
         </div>
       </div>
@@ -258,7 +263,7 @@ export function SignatureForm() {
               <p><strong>Player ID:</strong> {formData.playerId}</p>
               <p><strong>Amount:</strong> {formData.amount} ETH ({ethToWei(formData.amount)} wei)</p>
               <p><strong>Event ID:</strong> {formData.eventId}</p>
-              <p><strong>Contract:</strong> {import.meta.env.VITE_CONTRACT_ADDRESS}</p>
+              <p><strong>Contract:</strong> {formData.contractAddress}</p>
               <p><strong>Chain ID:</strong> {chainId}</p>
               <p><strong>Domain Name:</strong> RCadeRewardDistribution</p>
               <p><strong>Version:</strong> 1</p>

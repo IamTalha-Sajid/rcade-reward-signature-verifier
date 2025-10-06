@@ -31,12 +31,9 @@ export async function generateRewardClaimSignature(
   playerId: string,
   amount: string,
   eventId: string,
-  contractAddress?: string,
+  contractAddress: string,
   chainId?: number
 ): Promise<string> {
-  // Get values from environment variables or use provided values
-  const finalContractAddress = contractAddress || import.meta.env.VITE_CONTRACT_ADDRESS;
-  
   // Always use the provided chainId (from the connected wallet) or get it from the signer's provider
   let finalChainId = chainId;
   
@@ -47,17 +44,16 @@ export async function generateRewardClaimSignature(
       const network = await provider.getNetwork();
       finalChainId = Number(network.chainId);
     } else {
-      // Fallback to environment variable
-      finalChainId = Number(import.meta.env.VITE_CHAIN_ID);
+      throw new Error('Chain ID must be provided or wallet must be connected');
     }
   }
 
-  if (!finalContractAddress || finalContractAddress === '0x0000000000000000000000000000000000000000') {
-    throw new Error('Contract address must be provided either as parameter or in VITE_CONTRACT_ADDRESS environment variable');
+  if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
+    throw new Error('Contract address must be provided');
   }
 
   if (!finalChainId || finalChainId === 0) {
-    throw new Error('Chain ID must be provided either as parameter or in VITE_CHAIN_ID environment variable');
+    throw new Error('Chain ID must be provided or wallet must be connected');
   }
 
   // EIP-712 domain separator - values match the contract exactly
@@ -65,7 +61,7 @@ export async function generateRewardClaimSignature(
     name: "RCadeRewardDistribution",
     version: "1",
     chainId: finalChainId,
-    verifyingContract: finalContractAddress
+    verifyingContract: contractAddress
   };
   
   // Create the data to sign
