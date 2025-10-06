@@ -58,7 +58,7 @@ export async function generateRewardClaimSignature(
 
   // EIP-712 domain separator - values match the contract exactly
   const domain: EIP712Domain = {
-    name: "RCadeRewardDistribution",
+    name: "RcadeRewardDistribution",
     version: "1",
     chainId: finalChainId,
     verifyingContract: contractAddress
